@@ -1,0 +1,424 @@
+external function LongInt TimeToSeconds2(Time);
+external function Integer SetDateOrder(string);
+external procedure LongDateToStr(Date,Integer,var string);
+external updating procedure GSXQueueIdleTasksExecute();
+external function LongInt TimeDiffInSeconds(Time,Time);
+external function time AddTime_Minutes(time,time);
+external function Boolean PasteActTypeInAct(string,var record ActVc);
+external procedure SetActTypeValues(record ActVc);
+external function LongInt TimeToMinutes(Time);
+external procedure FindUserMailboxName(string,var string,var string);
+external updating function Boolean SendMailFromSystem(string,string,string,string,LongInt,Integer,string);
+external updating function Boolean SendSMSFromSystem(string,string,string,string);
+external procedure ExtractObj(string,var Integer,var string);
+external function Boolean SendNotificationToUser(string,string);
+
+updating procedure SendSMSRemindersForCourse(record CourseEventVc CourseEventr,record CourseReminderBlock CRb)
+begin
+  record CourseVc Courser;
+  record CourseEventVc oldCourseEventr;
+  row CourseEventVc CourseEventrw;
+  record SMSVc SMSr,SMS2r;
+  record LTxtVc STr;
+  record CUVc CUr;
+  integer i,j,l,rwcnt,pos;
+  string 255 tstr,tstr2;
+  record BARulesBlock BARb;
+  vector boolean custsent;
+
+  if (true or CourseEventr.RemindersSent==0) then begin
+    Courser.Code = CourseEventr.CourseCode;
+    if (ReadFirstMain(Courser,1,true)) then begin
+      STr.Code = Courser.SMSReminderText;
+    end;
+    if (blank(STr.Code)) then begin
+      STr.Code = CRb.SMSReminderText;
+    end;
+    
+    if (nonblank(STr.Code)) then begin
+      if (ReadFirstMain(STr,1,true)) then begin end;
+      l = SizeTextCnt(STr);
+      
+      if (l>0) then begin
+        BlockLoad(BARb);
+        rwcnt = MatRowCnt(CourseEventr);
+        for (i=0;i<rwcnt;i=i+1) begin
+          MatRowGet(CourseEventr,i,CourseEventrw);
+          
+          if (CourseEventrw.Status==kCourseEventPaticipantStatusPaying or CourseEventrw.Status==kCourseEventPaticipantStatusNotPaying) then begin
+            CUr.Code = CourseEventrw.ContactCode;
+            if (blank(CUr.Code)) then begin
+              CUr.Code = CourseEventrw.CustCode;
+            end;
+            if (nonblank(CUr.Code)) then begin
+              if (ReadFirstMain(CUr,1,true)) then begin
+                if (nonblank(CUr.Mobile) and CUr.NoLetterPosting==0 and CUr.NoMailPosting==0) then begin
+                  if (custsent[CUr.Code]==false) then begin
+
+                    RecordNew(SMSr);
+                    
+                    pos = 0;
+                    while (pos<l) begin
+                      tstr = StringFromText(STr,pos,1);
+                      if (tstr=="%") then begin
+                        tstr2 = StringFromText(STr,pos+1,1);
+                        switch (tstr2) begin
+                          case "d":
+                            tstr = CourseEventr.TransDate;
+                            pos = pos+1;
+                          case "t": 
+                            tstr = CourseEventr.StartTime;
+                            pos = pos+1;
+                          case "c":
+                            tstr = CourseEventr.CourseName;
+                            pos = pos+1;
+                          case "n":
+                            tstr = CUr.Person;
+                            pos = pos+1;
+                          case "%":
+                            pos = pos+1;
+                        end;
+                      end;
+                      
+                      AddToText(tstr,SMSr);
+                      pos = pos + 1;
+                    end;
+
+                    custsent[CUr.Code] = true;
+
+                    SMSr.PhoneNo = CUr.Mobile;
+                    SMSr.CustCode = CUr.Code;
+                    
+                    SMSr.FromPhoneNo = BARb.SystemMobile;
+                    if (blank(SMSr.FromPhoneNo)) then begin
+                      SMSr.FromPhoneNo = SMSr.PhoneNo;
+                    end;
+                    
+                    SMSr.SendFlag = 1;
+                    SMSr.SerNr = NextSerNr("SMSVc",SMSr.TransDate,-1,false,"");
+
+                    if (RecordInsert(SMSr,true)==false) then begin end;
+                  end;
+                end;
+              end;
+            end;
+          end;
+        end;
+      end;
+    end;
+    
+    RecordCopy(oldCourseEventr,CourseEventr);
+    CourseEventr.RemindersSent = 1;
+    
+    if (RecordUpdate(oldCourseEventr,CourseEventr,false)!=0) then begin
+      LogText(0,"Sending reminder for course event " & CourseEventr.SerNr & " in company " & CurrentCompany & " failed.");
+    end;
+  end;
+  
+  return;
+end;
+
+global
+updating procedure SendCourseSMSReminders(string arg)
+begin
+  integer i,rwcnt,oldcomp;
+  record CompaniesBlock Compb;
+  row CompaniesBlock Comprw;
+  boolean treatedf;
+  record CourseEventVc CourseEventr;
+  record CourseReminderBlock CRb;
+  time t;
+
+  BlockLoad(CRb);
+  
+  treatedf = false;
+  oldcomp = CurrentCompany;  
+  BlockLoad(Compb);
+  rwcnt = MatRowCnt(Compb);  
+  for (i=0;i<rwcnt;i=i+1) begin
+    MatRowGet(Compb,i,Comprw);
+    if (blank(Comprw.TCPIP)) then begin
+      if (SetCompanyCode(Comprw.CompCode,false)) then begin
+        CourseEventr.TransDate = AddDay(CurrentDate,CRb.DaysBeforeEvent);
+        CourseEventr.RemindersSent = 0;
+        CourseEventr.StatusFlag = 0;
+        if (ReadFirstKey("RemindersSent",CourseEventr,3,true)) begin
+          SendSMSRemindersForCourse(CourseEventr,CRb);
+          treatedf = true;
+          i = rwcnt;
+        end;
+      end;
+    end;
+  end;
+  ResetCompany(oldcomp);
+
+  if (treatedf) then begin
+    t = CurrentTime;
+    t.minute = t.minute + 5;
+    NewTimedTask("CourseSMSReminder","Send SMS reminder for upcoming courses","SendCourseSMSReminders","",CurrentDate,t,"","");
+  end else begin
+    NewTimedTask("CourseSMSReminder","Send SMS reminder for upcoming courses","SendCourseSMSReminders","",AddDay(CurrentDate,1),CRb.ReminderTime,"","");
+  end;
+
+  return;
+end;
+
+global
+procedure InitCourseSMSReminderTask()
+begin
+  record CourseReminderBlock CRb;
+  time t;
+  
+  BlockLoad(CRb);
+  if (CRb.SendReminders==1 and nonblanktime(CRb.ReminderTime) and CRb.DaysBeforeEvent>0) then begin
+    if (CRb.ReminderTime < CurrentTime) then begin
+      t = CurrentTime;
+      t.minute = t.minute + 2;
+      CRb.ReminderTime = t;
+    end;
+    NewTimedTask("CourseSMSReminder","Send SMS reminder for upcoming courses","SendCourseSMSReminders","",CurrentDate,CRb.ReminderTime,"","");
+  end;
+  return;
+end;
+
+updating function Boolean SendMsgs(record AlarmVc Alarmr)
+begin
+  Boolean res;
+  string 255 person;
+  Integer pos;
+  string 255 mailboxnr,to,recidstr;
+  record ActVc Actr;
+  Integer oldcomp;
+   
+  oldcomp = CurrentCompany;
+  if (oldcomp!=Alarmr.CompNo) then begin
+    if (SetCompany(Alarmr.CompNo,false)) then begin
+    end;
+  end;
+  Actr.SerNr = Alarmr.ActSerNr;
+  if (ReadFirstMain(Actr,1,true)) then begin
+  end;
+  if (oldcomp!=Alarmr.CompNo) then begin
+    ResetCompany(oldcomp);
+  end;
+  recidstr = BuildRecordIdStr(Actr,Alarmr.CompNo);
+  
+  pos = 0;
+  ExtractObj(Alarmr.MainPersons,pos,person);
+  while (nonblank(person)) begin
+    FindUserMailboxName(person,mailboxnr,to);
+    if (nonblank(to)) then begin
+      if (SendAlarmMessage(Alarmr.Comment,"",to,recidstr)) then begin
+        res = true;
+      end;      
+    end;
+    ExtractObj(Alarmr.MainPersons,pos,person);
+  end;  
+
+  pos = 0;
+  ExtractObj(Alarmr.CCPersons,pos,person);
+  while (nonblank(person)) begin
+    FindUserMailboxName(person,mailboxnr,to);
+    if (nonblank(to)) then begin
+      if (SendAlarmMessage(Alarmr.Comment,"",to,recidstr)) then begin
+        res = true;
+      end;      
+    end;
+    ExtractObj(Alarmr.CCPersons,pos,person);
+  end;  
+
+  SendMsgs = res;
+  return;
+end;
+
+global
+function string 255 GetUserMobileNr(record UserVc Userr)
+begin
+  string 255 res;
+  record CUVc CUr;
+  
+  if (nonblank(Userr.CustCode)) then begin
+    CUr.Code = Userr.CustCode;
+    if (ReadFirstMain(CUr,1,true)) then begin
+      res = CUr.Mobile;
+    end;
+  end;
+  if (blank(res)) then begin
+    res = Userr.Phone1;
+  end;
+  if (blank(res)) then begin
+    res = Userr.Phone2;
+  end;
+  
+  GetUserMobileNr = res;
+end;
+
+updating function Boolean SendSMSes(record AlarmVc Alarmr)
+begin
+  Boolean res;
+  string 255 person;
+  Integer pos;
+  record UserVc Userr;
+  string 255 mobile;
+  Integer oldcomp;
+  
+  pos = 0;
+  ExtractObj(Alarmr.MainPersons,pos,person);
+  while (nonblank(person)) begin
+    oldcomp = CurrentCompany;
+    if (oldcomp!=Alarmr.CompNo) then begin
+      if (SetCompany(Alarmr.CompNo,false)) then begin
+      end;
+    end;
+    Userr.Code = person;
+    if (ReadFirstMain(Userr,1,true)) then begin
+      mobile = GetUserMobileNr(Userr);
+      if (nonblank(mobile)) then begin
+        if (SendSMSFromSystem("",mobile,Alarmr.Comment,"")) then begin
+          res = true;
+        end;      
+      end;
+    end;
+    if (oldcomp!=Alarmr.CompNo) then begin
+      ResetCompany(oldcomp);
+    end;
+    ExtractObj(Alarmr.MainPersons,pos,person);
+  end;  
+
+  pos = 0;
+  ExtractObj(Alarmr.CCPersons,pos,person);
+  while (nonblank(person)) begin
+    oldcomp = CurrentCompany;
+    if (oldcomp!=Alarmr.CompNo) then begin
+      if (SetCompany(Alarmr.CompNo,false)) then begin
+      end;
+    end;
+    Userr.Code = person;
+    if (ReadFirstMain(Userr,1,true)) then begin
+      mobile = GetUserMobileNr(Userr);
+      if (nonblank(mobile)) then begin
+        if (SendSMSFromSystem("",mobile,Alarmr.Comment,"")) then begin
+          res = true;
+        end;      
+      end;
+    end;
+    if (oldcomp!=Alarmr.CompNo) then begin
+      ResetCompany(oldcomp);
+    end;
+    ExtractObj(Alarmr.CCPersons,pos,person);
+  end;  
+
+  SendSMSes = res;
+  return;
+end;
+
+updating function Boolean SendMails(record AlarmVc Alarmr)
+begin
+  Boolean res;
+  string 255 person;
+  Integer pos;
+  
+  pos = 0;
+  ExtractObj(Alarmr.MainPersons,pos,person);
+  while (nonblank(person)) begin
+    if (SendMailFromSystem("Alarmr.Sender",person,Alarmr.Comment,Alarmr.StdTxt,Alarmr.ActSerNr,Alarmr.CompNo,"AlarmVc")) then begin	// Edit ************************** Wednesday, 17 October 2012 10:42:50
+      res = true;
+    end;      
+    ExtractObj(Alarmr.MainPersons,pos,person);
+  end;  
+
+  pos = 0;
+  ExtractObj(Alarmr.CCPersons,pos,person);
+  while (nonblank(person)) begin
+    if (SendMailFromSystem("Alarmr.Sender",person,Alarmr.Comment,Alarmr.StdTxt,Alarmr.ActSerNr,Alarmr.CompNo,"AlarmVc")) then begin	// Edit ************************** Wednesday, 17 October 2012 10:42:50
+      res = true;
+    end;      
+    ExtractObj(Alarmr.CCPersons,pos,person);
+  end;  
+
+  SendMails = res;
+  return;
+end;
+
+updating function Boolean SendNotifications(record AlarmVc Alarmr)
+begin
+  Boolean res;
+  string 255 person;
+  Integer pos;
+  
+  pos = 0;
+  ExtractObj(Alarmr.MainPersons,pos,person);
+  while (nonblank(person)) begin
+    if (SendNotificationToUser(person,Alarmr.Comment)) then begin
+      res = true;
+    end;
+    ExtractObj(Alarmr.MainPersons,pos,person);
+  end;
+  
+  pos = 0;
+  ExtractObj(Alarmr.CCPersons,pos,person);
+  while (nonblank(person)) begin
+    if (SendNotificationToUser(person,Alarmr.Comment)) then begin
+      res = true;
+    end;
+    ExtractObj(Alarmr.CCPersons,pos,person);
+  end;
+  
+  SendNotifications = res;
+end;
+
+global
+updating function Boolean AlarmIdleTasks()
+begin
+  Boolean found,updatef,testf;
+  record AlarmVc Alarmr;
+  record AlarmVc oldAlarmr;
+  Time endtime;
+  record CYBlock CYb;
+  
+  BlockLoad(CYb);
+  if (CYb.LockedLevel!=0) then begin
+    RemoveTask("TreatAlarmIdleTasks");
+    goto LAlarmIdleTasks;
+  end;
+  endtime = CurrentTime;
+  endtime.minute = endtime.minute; //+1
+  found = true;
+  Alarmr.TransDate = CurrentDate;
+  while (LoopBackKey("ActDate",Alarmr,1,found)) begin
+    if (Alarmr.TransDate>CurrentDate) then begin
+      found = false;
+    end;
+    testf = found;
+    if (Alarmr.TransDate==CurrentDate) then begin
+      if (Alarmr.TransTime>endtime) then begin //?
+        testf = false;
+      end;
+    end;
+    if (testf) then begin
+      RecordCopy(oldAlarmr,Alarmr);
+      switch (Alarmr.AlarmType) begin
+        case kAlarmTypeMessage: updatef = SendMsgs(Alarmr);
+        case kAlarmTypeSMS:     updatef = SendSMSes(Alarmr);
+        case kAlarmTypeEMail:   updatef = SendMails(Alarmr);
+        case kAlarmTypeNotification: updatef = SendNotifications(Alarmr);
+      end;
+    end;
+    if (updatef) then begin
+      Alarmr.OKFlag = 1;
+      if (RecordUpdate(oldAlarmr,Alarmr,true)) then begin end;
+      StepBack(Alarmr);
+    end;
+  end;
+  AlarmIdleTasks = RecordsInIndex("AlarmVc","ActDate");
+LAlarmIdleTasks:;  
+  return;
+end;
+
+global
+updating procedure TreatAlarmIdleTasks(string arg)
+begin
+  if (AlarmIdleTasks) then begin
+  end;
+  return;
+end;
