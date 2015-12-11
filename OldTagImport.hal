@@ -746,6 +746,7 @@ begin
   //Userr.UUID = ImportField; // NewAutosyncRegister
   ImportField; // NewAutosyncRegister
   ImportField; // NewAutosyncRegister
+  ImportField; // NewAutosyncRegister
   Userr.Code = ImportField;
   Userr.Name = ImportField;
   Userr.OldPassWord = ImportField;
