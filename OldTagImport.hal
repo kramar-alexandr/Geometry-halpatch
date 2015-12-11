@@ -4,6 +4,7 @@ begin
   row PRVc PRrw;
   integer rwcnt;
   
+  
   RecordNew(PRr);
   PRr.Code = ImportField;
   PRr.CustCode = ImportField;
@@ -328,6 +329,7 @@ begin
   RecordNew(CUr);
   //r.UUID = ImportField; // NewAutosyncRegister
   //CUr.UUID = ImportField; // NewAutosyncRegister
+  ImportField; // NewAutosyncRegister
   ImportField; // NewAutosyncRegister
   ImportField; // NewAutosyncRegister
   CUr.Code = ImportField;
