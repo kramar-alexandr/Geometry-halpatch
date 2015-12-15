@@ -639,6 +639,20 @@ begin
   POr.BranchID = ImportField;
   POr.NoTAXonVAT = StringToLongint(ImportField);
   
+  POr.Confirns = StringToInt(ImportField);
+  POr.Region = ImportField;
+  POr.OrderType = StringToInt(ImportField);
+  POr.AcceptanceStatus = StringToInt(ImportField);
+  POr.SVONr = StringToLongint(ImportField);
+  POr.OrderStockFlag = StringToInt(ImportField);
+  POr.ValidUntil = StringToDate(ImportField);
+  POr.VETaxTemplateCode = ImportField;
+  ImportPackedMatrix(TMr);
+  PackFieldMatrix(POr,"TaxMatrix",TMr);
+  POr.RebCode = ImportField;
+  POr.AlertFlag = StringToInt(ImportField);
+  POr.OKDate = StringToDate(ImportField);
+    
   rwcnt = 0;
   
   while (NextImportLine(false)) begin
@@ -695,20 +709,7 @@ begin
     MatRowPut(POr,rwcnt,POrw);
     rwcnt = rwcnt + 1;
   end;
-  POr.Confirns = StringToInt(ImportField);
-  POr.Region = ImportField;
-  POr.OrderType = StringToInt(ImportField);
-  POr.AcceptanceStatus = StringToInt(ImportField);
-  POr.SVONr = StringToLongint(ImportField);
-  POr.OrderStockFlag = StringToInt(ImportField);
-  POr.ValidUntil = StringToDate(ImportField);
-  POr.VETaxTemplateCode = ImportField;
-  ImportPackedMatrix(TMr);
-  PackFieldMatrix(POr,"TaxMatrix",TMr);
-  POr.RebCode = ImportField;
-  POr.AlertFlag = StringToInt(ImportField);
-  POr.OKDate = StringToDate(ImportField);
-  
+    
   return;
 end;
 
@@ -949,6 +950,18 @@ begin
   VIr.TaxAuthIDCC = ImportField;
   VIr.BranchID = ImportField;
   VIr.NoTAXonVAT = StringToLongint(ImportField);
+  VIr.PrelAPAcc = ImportField;
+  VIr.IVNr = StringToLongint(ImportField);
+  VIr.CAE = ImportField;
+  VIr.CAEExpiry = StringToDate(ImportField);
+  VIr.Region = ImportField;
+  VIr.OrderType = StringToInt(ImportField);
+  VIr.RebVal2 = StringToVal(ImportField,M4Val);
+  VIr.AcceptanceStatus = StringToInt(ImportField);
+  VIr.VETaxTemplateCode = ImportField;
+  ImportPackedMatrix(TMr);
+  PackFieldMatrix(VIr,"TaxMatrix",TMr);
+  VIr.OperType = ImportField;
   
   rwcnt = 0;
   
@@ -986,18 +999,7 @@ begin
     MatRowPut(VIr,rwcnt,VIrw);
     rwcnt = rwcnt + 1;
   end;
-  VIr.PrelAPAcc = ImportField;
-  VIr.IVNr = StringToLongint(ImportField);
-  VIr.CAE = ImportField;
-  VIr.CAEExpiry = StringToDate(ImportField);
-  VIr.Region = ImportField;
-  VIr.OrderType = StringToInt(ImportField);
-  VIr.RebVal2 = StringToVal(ImportField,M4Val);
-  VIr.AcceptanceStatus = StringToInt(ImportField);
-  VIr.VETaxTemplateCode = ImportField;
-  ImportPackedMatrix(TMr);
-  PackFieldMatrix(VIr,"TaxMatrix",TMr);
-  VIr.OperType = ImportField;
+  
   
   return;
 end;
@@ -1086,7 +1088,11 @@ begin
   FEVIr.VEEventDate = StringToDate(ImportField);
   FEVIr.PMComment = ImportField;
   FEVIr.OPNr = StringToLongint(ImportField);
-  
+  FEVIr.Sum1 = StringToVal(ImportField,M4Val);
+  FEVIr.Sum2 = StringToVal(ImportField,M4Val);
+  FEVIr.TAXAdv = StringToVal(ImportField,M4Val);
+  FEVIr.RebVal2 = StringToVal(ImportField,M4Val);
+  FEVIr.VIRebDate2 = StringToDate(ImportField);
   rwcnt = 0;
   
   while (NextImportLine(false)) begin
@@ -1113,11 +1119,7 @@ begin
     MatRowPut(FEVIr,rwcnt,FEVIrw);
     rwcnt = rwcnt + 1;
   end;
-  FEVIr.Sum1 = StringToVal(ImportField,M4Val);
-  FEVIr.Sum2 = StringToVal(ImportField,M4Val);
-  FEVIr.TAXAdv = StringToVal(ImportField,M4Val);
-  FEVIr.RebVal2 = StringToVal(ImportField,M4Val);
-  FEVIr.VIRebDate2 = StringToDate(ImportField);
+  
   
   return;
 end;
