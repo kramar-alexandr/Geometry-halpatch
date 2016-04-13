@@ -9,7 +9,7 @@ external procedure SetMailForward(record MailVc);
 external procedure FindCurMailboxName(var string);
 external procedure GetMailFormattingSettings(record MailVc,var record ConfVc);
 external function string 255 CleanupUTF8String(string);
-external function Boolean RecordAction_raEMailQue(var record MailVc,Boolean);
+external updating function Boolean RecordAction_raEMailQue(var record MailVc,Boolean);
 
 global
 procedure ResolveMailboxNumber(var row MailVc mailrw)

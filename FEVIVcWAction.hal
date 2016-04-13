@@ -1,6 +1,6 @@
 remote procedure FEVIVc_PasteAccNumber(var record FEVIVc,Integer);
 remote procedure FEVIVc_PasteVECode(var record FEVIVc,var string,string);
-remote outer procedure SumUpFEVIVcM(record FEVIVc,var val,var val,var val); // 62
+external outer procedure SumUpFEVIVcM(record FEVIVc,var val,var val,var val); // 62
 
 function Boolean FEVIDClassVECodeEFAfter(Integer wn,Integer changedf)
 begin

@@ -2,7 +2,7 @@ external function Boolean OtherExchangeRate(val,val,val,val,val,val,val,val,val,
 external procedure GetFullCurncyRate (var string,Date,var val,var val,var val,var val,var val);
 external function Boolean DateLocked(Date,string);
 external procedure MailTextRow2(string,string,string,string,var row MailTextVc,var Integer);
-external procedure MailTextRow(string,string,var row MailTextVc,var Integer);//Edit-------------------Dima 03.12.2015 (from Hansa 6 -> 8)
+external procedure MailTextRow(string,string,string,var row MailTextVc,var Integer);//Edit-------------------Dima 03.12.2015 (from Hansa 6 -> 8)
 external procedure FindUserMailboxName(string,var string,var string);
 external procedure OPVc_PasteBankCurncy(var record OPVc,Integer);
 external function Boolean WarnOldRecords(Date,string,LongInt);
@@ -1022,7 +1022,7 @@ begin
   end;
   MArw.AddrCode = tstr;//SAV 6016
   MatRowPut(Mailr,1,MArw);
-  MailTextRow("OPVc",OPr.LangCode,MTrw,IgnoreRecordDetails);
+  MailTextRow("OPVc","",OPr.LangCode,MTrw,IgnoreRecordDetails);
   Mailr.Header = MTrw.Header;
   Mailr.Header = Mailr.Header & USetStr(1751) & " ";
   Mailr.Header = Mailr.Header & OPr.SerNr;  
