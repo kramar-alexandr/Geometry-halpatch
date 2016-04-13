@@ -1,4 +1,4 @@
-external outer function boolean TriggerCaption(integer);// проверка активности "доработок"
+//external outer function boolean TriggerCaption(integer);// проверка активности "доработок"
 external function val MulRateToBase1(var string,val,val,val,val,val,val,roundmode);
 external procedure NewLineExport();
 external procedure GetVATRowFromBlock(string,record VATCodeBlock,var row VATCodeBlock);

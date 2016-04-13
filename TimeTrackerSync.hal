@@ -1,5 +1,5 @@
 external function longint DateDiff(date,date);
-external function longint TimeDiff(time,time);
+//external function longint TimeDiff(time,time);
 //external function longint ExactTimeDiff(Time,Time,var Time);
 external function longint TimeDiffInSeconds(Time,Time);
 external function Boolean FindTheUser(var record UserVc);
