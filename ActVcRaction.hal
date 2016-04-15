@@ -1,0 +1,256 @@
+external updating function boolean AuthTurboSMS(var string);
+external updating function val GetCreditBalanceTurboSMS(string);
+external updating function boolean EasySendTurboSMS(string,string);
+external procedure ExtractObj(string,var Integer,var string);
+external function string 255 StrReplace(string,string,string);
+
+external updating procedure ActOK(record ActVc);
+external updating procedure CreateConsequences(record ActVc);
+external updating procedure CreateAlarm(record ActVc);
+external updating procedure DeleteAlarm(record ActVc);
+external updating procedure UpdateAlarm(record ActVc);
+external updating procedure InvalidateTR(Integer,LongInt);
+
+global
+updating function LongInt ActVcRecordSaveAfter(var record ActVc Actr,record ActVc Act2r,LongInt stat,LongInt long4)
+BEGIN
+  LongInt res;
+  record UserVc Ur;
+  record AcceptanceRulesVc ARr;
+  string 255 reciever, text;
+  string 5 person;
+  string 15 phone;
+  string 30 phonetmp;
+  integer pos;
+  boolean testf,test2f;
+  
+  if (Actr.OKFlag!=0) then begin
+    ActOK(Actr);        // Swapped to fix order of operation with approval rules.
+    CreateConsequences(Actr);
+//    ActOK(Actr);
+  end;
+  if (Actr.OKFlag==0) then begin
+    CreateAlarm(Actr);  
+  end;
+  
+  testf = false;
+  if Actr.TodoFlag==kTodoFlagApproval then begin
+    while (loopmain(ARr,1,testf==false)) begin
+      if ARr.AcceptanceActType==Actr.ActType then begin
+        testf = true;
+      end;
+    end;
+  end;
+  if testf begin
+    ExtractObj(Actr.MainPersons,pos,person);
+    while (nonblank(person)) begin
+      Ur.Code = person;
+      if ReadFirstMain(Ur,1,true) then begin
+        if nonblank(Ur.Phone1) then begin
+          phonetmp = Ur.Phone1;
+        end else begin
+          phonetmp = Ur.Phone2;
+        end;
+        if nonblank(phonetmp) then begin
+          phonetmp = StrReplace(phonetmp,"-","");
+          phonetmp = StrReplace(phonetmp," ","");
+          phonetmp = StrReplace(phonetmp,"(","");
+          phonetmp = StrReplace(phonetmp,")","");
+          phonetmp = StrReplace(phonetmp,"*","");
+          switch (left(phonetmp,1)) begin
+            case "+":
+              phone = phonetmp;
+            case "3":
+              phone = "+" & phonetmp;
+            case "8":
+              phone = "+3" & phonetmp;
+            case "0":
+              phone = "+38" & phonetmp;
+            otherwise
+              phone = "+380" & phonetmp;
+          end;
+          reciever = reciever & phone & ",";
+        end;
+      end;
+      ExtractObj(Actr.MainPersons,pos,person);
+    end;
+    reciever = left(reciever,len(reciever) - 1);
+    text = "Please approve ";
+    test2f = false;
+    switch (Actr.FromFileName) begin
+      case "POVc":
+        if blank(Actr.ActResult) then begin
+          text = text & "PO ";
+          test2f = true;
+        end;
+      case "IPVc":
+        if blank(Actr.ActResult) then begin
+          text = text & "payment ";
+          test2f = true;
+        end;
+      case "PIVc":
+        if blank(Actr.ActResult) then begin
+          text = text & "payment ";
+          test2f = true;
+        end;
+      case "QTVc":
+        if blank(Actr.ActResult) then begin
+          text = text & "CE ";
+          test2f = true;
+        end;
+    end;
+    if test2f then begin
+      text = text & Actr.FromSerNr;
+      Ur.Code = CurrentUser;
+      if ReadFirstMain(Ur,1,true) then begin
+        text = text & " from ";
+        if nonblank(Ur.emailAddr) then begin
+          text = text & Ur.emailAddr;
+        end else begin
+          text = text & Ur.Name;
+        end;
+      end;
+      EasySendTurboSMS(reciever,text);
+    end;
+  end;
+  
+  ActVcRecordSaveAfter = res;
+  RETURN;
+END;
+
+global
+updating function LongInt ActVcRecordUpdateAfter(var record ActVc Actr,record ActVc Act2r,LongInt stat,LongInt long4)
+BEGIN
+  LongInt res;
+  record UserVc Ur;
+  record AcceptanceRulesVc ARr;
+  string 255 reciever,text;
+  string 5 person;
+  string 15 phone,appr,corr,rej;
+  string 30 phonetmp;
+  integer pos;
+  boolean testf,test2f,test3f;
+  
+  transaction Boolean gActVcRecordUpdateAfterf;
+
+  gActVcRecordUpdateAfterf = true;
+  if ((Actr.OKFlag!=0) and (Act2r.OKFlag==0)) then begin
+    ActOK(Actr);   // Swapped to fix order of operation with approval rules.
+    CreateConsequences(Actr);
+//    ActOK(Actr);
+    DeleteAlarm(Actr);  
+  end;
+  if ((Actr.OKFlag==0) and (Act2r.OKFlag==0)) then begin
+    if (Actr.TransDate!=Act2r.TransDate) or
+       (Actr.StartTime!=Act2r.StartTime) or 
+       (Actr.MainPersons!=Act2r.MainPersons) or
+       (Actr.CCPersons!=Act2r.CCPersons) or
+       (Actr.Comment!=Act2r.Comment) or
+       (Actr.AlarmType!=Act2r.AlarmType) or
+       (Actr.AlarmUnits!=Act2r.AlarmUnits) or
+       (Actr.AlarmWhen!=Act2r.AlarmWhen) then begin
+      UpdateAlarm(Actr);  
+    end;
+  end;
+  if ((Act2r.Invalid==0) and (Actr.Invalid!=0)) then begin
+    if (Act2r.OKFlag!=0) then begin
+      InvalidateTR(ActYc,Actr.TRSerNr);
+    end;
+  end;
+  gActVcRecordUpdateAfterf = false;
+  
+  testf = false;
+  if (Act2r.OKFlag==0) and (Actr.OKFlag==1) then begin
+    if Actr.TodoFlag==kTodoFlagApproval then begin
+      while (loopmain(ARr,1,testf==false)) begin
+        if ARr.AcceptanceActType==Actr.ActType then begin
+          testf = true;
+          appr = ARr.AcceptedActType;
+          corr = ARr.CancelledActType;
+          rej = ARr.RejectedActType;
+        end;
+      end;
+    end;
+  end;
+  if testf begin
+    ExtractObj(Actr.MainPersons,pos,person);
+    while (nonblank(person)) begin
+      Ur.Code = person;
+      if ReadFirstMain(Ur,1,true) then begin
+        if nonblank(Ur.Phone1) then begin
+          phonetmp = Ur.Phone1;
+        end else begin
+          phonetmp = Ur.Phone2;
+        end;
+        if nonblank(phonetmp) then begin
+          phonetmp = StrReplace(phonetmp,"-","");
+          phonetmp = StrReplace(phonetmp," ","");
+          phonetmp = StrReplace(phonetmp,"(","");
+          phonetmp = StrReplace(phonetmp,")","");
+          phonetmp = StrReplace(phonetmp,"*","");
+          switch (left(phonetmp,1)) begin
+            case "+":
+              phone = phonetmp;
+            case "3":
+              phone = "+" & phonetmp;
+            case "8":
+              phone = "+3" & phonetmp;
+            case "0":
+              phone = "+38" & phonetmp;
+            otherwise
+              phone = "+380" & phonetmp;
+          end;
+          reciever = reciever & phone & ",";
+        end;
+      end;
+      ExtractObj(Actr.MainPersons,pos,person);
+    end;
+    reciever = left(reciever,len(reciever) - 1);
+    test2f = false;
+    switch (Actr.FromFileName) begin
+      case "POVc":
+        text = "PO ";
+        test2f = true;
+      case "IPVc":
+        text = "Payment ";
+        test2f = true;
+      case "PIVc":
+        text = "Payment ";
+        test2f = true;
+      case "QTVc":
+        text = "CE ";
+        test2f = true;
+    end;
+    if test2f then begin
+      text = text & Actr.FromSerNr & " was ";
+      test3f = false;
+      if (Actr.ActResult==appr) then begin
+        text = text & "approved ";
+        test3f = true;
+      end;
+      if (Actr.ActResult==corr) then begin
+        text = text & "sent for correction ";
+        test3f = true;
+      end;
+      if (Actr.ActResult==rej) then begin
+        text = text & "rejected ";
+        test3f = true;
+      end;
+      if test3f then begin
+        Ur.Code = CurrentUser;
+        if ReadFirstMain(Ur,1,true) then begin
+          text = text & "by ";
+          if nonblank(Ur.emailAddr) then begin
+            text = text & Ur.emailAddr;
+          end else begin
+            text = text & Ur.Name;
+          end;
+        end;
+        EasySendTurboSMS(reciever,text);
+      end;
+    end;
+  end;
+  
+  ActVcRecordUpdateAfter = res;
+  RETURN;
+END;
